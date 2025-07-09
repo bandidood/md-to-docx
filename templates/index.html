@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown to DOCX Converter</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .preview-container {
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .mermaid-info {
+            background-color: #e7f3ff;
+            border-left: 4px solid #007bff;
+        }
+        .drag-drop-area {
+            border: 2px dashed #007bff;
+            border-radius: 0.375rem;
+            padding: 2rem;
+            text-align: center;
+            background-color: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .drag-drop-area:hover {
+            background-color: #e9ecef;
+            border-color: #0056b3;
+        }
+        .drag-drop-area.drag-over {
+            background-color: #cce5ff;
+            border-color: #004085;
+        }
+        .tab-content {
+            border: 1px solid #dee2e6;
+            border-top: none;
+            border-radius: 0 0 0.375rem 0.375rem;
+            padding: 1rem;
+        }
+        .nav-tabs {
+            border-bottom: 1px solid #dee2e6;
+        }
+        textarea.form-control {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="text-center mb-4">
+                    <h1 class="display-5 fw-bold text-primary">
+                        <i class="fas fa-file-alt me-2"></i>Markdown to DOCX Converter
+                    </h1>
+                    <p class="lead text-muted">Convert your Markdown files to Word documents with Mermaid diagram support</p>
+                </div>
+
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Mermaid Info Box -->
+                <div class="alert mermaid-info" role="alert">
+                    <h6 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Mermaid Diagrams Support</h6>
+                    <p class="mb-0">This converter supports Mermaid diagrams! Simply include them in your markdown using:</p>
+                    <pre class="mt-2 mb-0"><code>```mermaid
+graph TD
+    A[Start] --> B[Process]
+    B --> C[End]
+```</code></pre>
+                </div>
+
+                <!-- Main Form -->
+                <form id="converterForm" action="/convert" method="post" enctype="multipart/form-data">
+                    <div class="row">
+                        <!-- Input Section -->
+                        <div class="col-lg-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-upload me-2"></i>Input
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Tabs -->
+                                    <ul class="nav nav-tabs" id="inputTabs" role="tablist">
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link active" id="file-tab" data-bs-toggle="tab" data-bs-target="#file-pane" type="button" role="tab">
+                                                <i class="fas fa-file-upload me-1"></i>Upload File
+                                            </button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="text-tab" data-bs-toggle="tab" data-bs-target="#text-pane" type="button" role="tab">
+                                                <i class="fas fa-edit me-1"></i>Paste Text
+                                            </button>
+                                        </li>
+                                    </ul>
+
+                                    <div class="tab-content" id="inputTabContent">
+                                        <!-- File Upload Tab -->
+                                        <div class="tab-pane fade show active" id="file-pane" role="tabpanel">
+                                            <div class="drag-drop-area" id="dragDropArea">
+                                                <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                                <h5>Drop your markdown file here</h5>
+                                                <p class="text-muted">or click to browse</p>
+                                                <input type="file" class="form-control d-none" id="fileInput" name="file" accept=".md,.txt,.markdown">
+                                            </div>
+                                            <div id="fileInfo" class="mt-3 d-none">
+                                                <div class="alert alert-info">
+                                                    <i class="fas fa-file-alt me-2"></i>
+                                                    <span id="fileName"></span>
+                                                    <span class="badge bg-secondary ms-2" id="fileSize"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Text Input Tab -->
+                                        <div class="tab-pane fade" id="text-pane" role="tabpanel">
+                                            <textarea class="form-control" name="markdown_text" id="markdownText" rows="15" 
+                                                      placeholder="Paste your markdown content here...&#10;&#10;# Example&#10;This is a **bold** text and this is *italic*.&#10;&#10;```mermaid&#10;graph TD&#10;    A[Start] --> B[Process]&#10;    B --> C[End]&#10;```"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Preview Section -->
+                        <div class="col-lg-6">
+                            <div class="card">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-eye me-2"></i>Preview
+                                    </h5>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshPreview">
+                                        <i class="fas fa-sync-alt"></i> Refresh
+                                    </button>
+                                </div>
+                                <div class="card-body">
+                                    <div class="preview-container" id="previewContainer">
+                                        <p class="text-muted text-center"><em>Preview will appear here...</em></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="row mt-4">
+                        <div class="col-12 text-center">
+                            <button type="submit" class="btn btn-primary btn-lg me-3" id="convertBtn">
+                                <i class="fas fa-file-word me-2"></i>Convert to DOCX
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-lg" id="clearBtn">
+                                <i class="fas fa-trash me-2"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-5 py-4 border-top">
+            <div class="text-center text-muted">
+                <p>&copy; 2025 Markdown to DOCX Converter | Supports tables, code blocks, and Mermaid diagrams</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Loading Modal -->
+    <div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3 mb-0">Converting your markdown file...</p>
+                    <small class="text-muted">This may take a moment if you have Mermaid diagrams</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/autoloader/prism-autoloader.min.js"></script>
+    
+    <script>
+        // DOM elements
+        const dragDropArea = document.getElementById('dragDropArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const markdownText = document.getElementById('markdownText');
+        const previewContainer = document.getElementById('previewContainer');
+        const convertBtn = document.getElementById('convertBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const refreshPreview = document.getElementById('refreshPreview');
+        const converterForm = document.getElementById('converterForm');
+        const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+
+        // File drag and drop handling
+        dragDropArea.addEventListener('click', () => fileInput.click());
+        dragDropArea.addEventListener('dragover', handleDragOver);
+        dragDropArea.addEventListener('dragleave', handleDragLeave);
+        dragDropArea.addEventListener('drop', handleDrop);
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            dragDropArea.classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            dragDropArea.classList.remove('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            dragDropArea.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelect();
+            }
+        }
+
+        function handleFileSelect() {
+            const file = fileInput.files[0];
+            if (file) {
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                fileInfo.classList.remove('d-none');
+                
+                // Read file content for preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    updatePreview(e.target.result);
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Preview functionality
+        let previewTimeout;
+        markdownText.addEventListener('input', function() {
+            clearTimeout(previewTimeout);
+            previewTimeout = setTimeout(() => updatePreview(this.value), 500);
+        });
+
+        refreshPreview.addEventListener('click', function() {
+            const activeTab = document.querySelector('.nav-link.active').id;
+            if (activeTab === 'text-tab') {
+                updatePreview(markdownText.value);
+            } else if (fileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    updatePreview(e.target.result);
+                };
+                reader.readAsText(fileInput.files[0]);
+            }
+        });
+
+        function updatePreview(content) {
+            if (!content.trim()) {
+                previewContainer.innerHTML = '<p class="text-muted text-center"><em>No content to preview</em></p>';
+                return;
+            }
+
+            fetch('/preview', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ content: content })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    previewContainer.innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
+                } else {
+                    previewContainer.innerHTML = data.html;
+                    // Re-run Prism highlighting
+                    if (window.Prism) {
+                        Prism.highlightAllUnder(previewContainer);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Preview error:', error);
+                previewContainer.innerHTML = '<div class="alert alert-warning">Preview temporarily unavailable</div>';
+            });
+        }
+
+        // Form submission with loading modal
+        converterForm.addEventListener('submit', function(e) {
+            const activeTab = document.querySelector('.nav-link.active').id;
+            const hasFile = fileInput.files.length > 0;
+            const hasText = markdownText.value.trim().length > 0;
+            
+            if (activeTab === 'file-tab' && !hasFile) {
+                e.preventDefault();
+                alert('Please select a file to upload.');
+                return;
+            }
+            
+            if (activeTab === 'text-tab' && !hasText) {
+                e.preventDefault();
+                alert('Please enter some markdown text.');
+                return;
+            }
+            
+            // Show loading modal
+            loadingModal.show();
+        });
+
+        // Clear functionality
+        clearBtn.addEventListener('click', function() {
+            fileInput.value = '';
+            markdownText.value = '';
+            fileInfo.classList.add('d-none');
+            previewContainer.innerHTML = '<p class="text-muted text-center"><em>Preview will appear here...</em></p>';
+        });
+
+        // Tab switching
+        document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
+            tab.addEventListener('shown.bs.tab', function() {
+                // Clear preview when switching tabs
+                previewContainer.innerHTML = '<p class="text-muted text-center"><em>Preview will appear here...</em></p>';
+            });
+        });
+
+        // Hide loading modal on page load (in case of redirect back)
+        window.addEventListener('load', function() {
+            loadingModal.hide();
+        });
+    </script>
+</body>
+</html>
